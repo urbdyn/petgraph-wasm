@@ -16,20 +16,20 @@ import {DiGraph, toposort} from 'petgraph-wasm'
 const g = new DiGraph()
 
 // Add nodes to directional graph
-const nyc_index = g.addNode("Knoxville")
+const kno_index = g.addNode("Knoxville")
 const vil_index = g.addNode("Vilnius")
 const tai_index = g.addNode("Taipei")
 
 // Connect them with edges
-g.addEdge(nyc_index,vil_index)
-g.addEdge(nyc_index,tai_index)
+g.addEdge(kno_index,vil_index)
+g.addEdge(kno_index,tai_index)
 g.addEdge(vil_index,tai_index)
 
 // Sort them
 const sorted_g = toposort(g)
 
 // Detect cycles
-g.addEdge(tai_index,nyc_index)
+g.addEdge(tai_index,kno_index)
 //   Will throw error!
 toposort(g)
 ```
@@ -59,11 +59,11 @@ To work on this you will need to install rust-up and wasm-pack.
 
 ```bash
 # Build the npm package
-wasm-pack build
+wasm-pack build --target nodejs
 # Test on node
 wasm-pack test --node
 # Create release build
-wasm-pack build --target nodejs --release
+./bin/ci.sh
 # Try out benchmark of 100,000 nodes each with 15 edges
 time ./example_js/benchmark.js 100000 15
 ```
