@@ -1,5 +1,7 @@
 # petgraph-wasm
 
+[![NPM Version][npm-image]][npm-url]
+
 A work in progress, selective WASM wrapper around the fantastic [petgraph](https://github.com/petgraph/petgraph) library in Rust.
 
 This project aims to provide a direct port of the petgraph library to an NPM packages which preserves as much of the original API structure and design as possible.
@@ -67,3 +69,6 @@ wasm-pack test --node
 # Try out benchmark of 100,000 nodes each with 15 edges
 time ./example_js/benchmark.js 100000 15
 ```
+
+[npm-image]: https://img.shields.io/npm/v/@urbdyn/petgraph-wasm.svg
+[npm-url]: https://npmjs.org/package/@urbdyn/petgraph-wasm
