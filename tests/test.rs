@@ -5,7 +5,7 @@
 extern crate petgraph_wasm;
 extern crate wasm_bindgen_test;
 extern crate web_sys;
-use petgraph_wasm::algo::toposort;
+use petgraph_wasm::algo::{kosaraju_scc,tarjan_scc,toposort,SccGroups};
 use petgraph_wasm::graph_impl::DiGraph;
 use petgraph_wasm::{GraphError, GraphItemType};
 use wasm_bindgen::prelude::*;
@@ -76,4 +76,20 @@ fn can_detect_cycles() {
     let sort_err = toposort(&g).unwrap_err();
     let expect_err = GraphError::new("Cycle detected", GraphItemType::Node, 1);
     assert_eq!(sort_err.into_serde::<GraphError>().unwrap(), expect_err);
+}
+
+#[wasm_bindgen_test]
+fn can_get_kosaraju_scc() {
+    let (mut g, _nodes, _edges) = new_test_graph();
+    g.add_edge(2, 1, JsValue::NULL);
+    let scc_groups: SccGroups = kosaraju_scc(&g);
+    assert_eq!(scc_groups.to_std_vec(), vec![vec![0,3,2,1],vec![4]]);
+}
+
+#[wasm_bindgen_test]
+fn can_get_tarjan_scc() {
+    let (mut g, _nodes, _edges) = new_test_graph();
+    g.add_edge(2, 1, JsValue::NULL);
+    let scc_groups: SccGroups = tarjan_scc(&g);
+    assert_eq!(scc_groups.to_std_vec(), vec![vec![3,1,2,0],vec![4]]);
 }
