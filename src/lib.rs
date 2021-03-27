@@ -39,7 +39,7 @@ impl GraphError {
     }
 
     pub fn create_js_value(&self) -> Result<JsValue, String> {
-        JsValue::from_serde(&self).or(Result::Err(String::from("Failed to transform graph_error")))
+        JsValue::from_serde(&self).map_err(|_| String::from("Failed to transform graph_error"))
     }
 }
 
