@@ -93,7 +93,7 @@ impl DiGraph {
     pub fn edge_endpoints(&self, index: usize) -> Option<Vec<usize>> {
         self.graph
             .edge_endpoints(graph::EdgeIndex::new(index))
-            .and_then(|(i1, i2)| Some(vec![i1.index(), i2.index()]))
+            .map(|(i1, i2)| vec![i1.index(), i2.index()])
     }
 
     #[wasm_bindgen(js_name = removeNode)]
