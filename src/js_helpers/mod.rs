@@ -71,10 +71,7 @@ impl SccGroups {
 #[wasm_bindgen]
 impl SccGroup {
     fn new(inner: Rc<Vec<Vec<graph::NodeIndex>>>, index: usize) -> Self {
-        Self {
-            inner,
-            index,
-        }
+        Self { inner, index }
     }
 
     pub fn get(&self, index: usize) -> JsValue {
