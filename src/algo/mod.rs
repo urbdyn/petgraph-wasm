@@ -1,5 +1,5 @@
 use crate::graph_impl::DiGraph;
-use crate::js_helpers::SccGroups;
+use crate::js_helpers::scc_groups2::SccGroups;
 use crate::GraphError;
 use petgraph::algo;
 use petgraph::graph;
@@ -35,8 +35,9 @@ pub fn toposort(graph: &DiGraph) -> Result<Vec<usize>, JsValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::js_helpers::test::new_test_graph;
+    use crate::js_helpers::test::*;
     use crate::{GraphError, GraphItemType};
+    use graph::NodeIndex;
     use wasm_bindgen_test::*;
 
     #[wasm_bindgen_test]
@@ -57,23 +58,43 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn can_get_kosaraju_scc() {
-        let (mut g, _nodes, _edges) = new_test_graph();
+        let (mut g, _nodes, _edges) = new_test_graph2();
         g.add_edge(2, 1, JsValue::NULL);
         let scc_groups: SccGroups = kosaraju_scc(&g);
         assert_eq!(
-            scc_groups.copy_to_std_vec(),
-            vec![vec![0, 3, 2, 1], vec![4]]
+            scc_groups.try_into_vecs().unwrap(),
+            vec![
+                vec![NodeIndex::new(6)],
+                vec![NodeIndex::new(5)],
+                vec![
+                    NodeIndex::new(0),
+                    NodeIndex::new(3),
+                    NodeIndex::new(2),
+                    NodeIndex::new(1)
+                ],
+                vec![NodeIndex::new(4)]
+            ]
         );
     }
 
     #[wasm_bindgen_test]
     fn can_get_tarjan_scc() {
-        let (mut g, _nodes, _edges) = new_test_graph();
+        let (mut g, _nodes, _edges) = new_test_graph2();
         g.add_edge(2, 1, JsValue::NULL);
         let scc_groups: SccGroups = tarjan_scc(&g);
         assert_eq!(
-            scc_groups.copy_to_std_vec(),
-            vec![vec![3, 1, 2, 0], vec![4]]
+            scc_groups.try_into_vecs().unwrap(),
+            vec![
+                vec![
+                    NodeIndex::new(3),
+                    NodeIndex::new(1),
+                    NodeIndex::new(2),
+                    NodeIndex::new(0)
+                ],
+                vec![NodeIndex::new(4)],
+                vec![NodeIndex::new(6)],
+                vec![NodeIndex::new(5)]
+            ]
         );
     }
 }
