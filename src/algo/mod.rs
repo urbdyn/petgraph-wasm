@@ -62,7 +62,10 @@ mod tests {
         let (mut g, _nodes, _edges) = new_test_graph();
         g.add_edge(2, 1, JsValue::NULL);
         let scc_groups: SccGroups = kosaraju_scc(&g);
-        assert_eq!(scc_groups.copy_to_std_vec(), vec![vec![0, 3, 2, 1], vec![4]]);
+        assert_eq!(
+            scc_groups.copy_to_std_vec(),
+            vec![vec![0, 3, 2, 1], vec![4]]
+        );
     }
 
     #[wasm_bindgen_test]
@@ -70,6 +73,9 @@ mod tests {
         let (mut g, _nodes, _edges) = new_test_graph();
         g.add_edge(2, 1, JsValue::NULL);
         let scc_groups: SccGroups = tarjan_scc(&g);
-        assert_eq!(scc_groups.copy_to_std_vec(), vec![vec![3, 1, 2, 0], vec![4]]);
+        assert_eq!(
+            scc_groups.copy_to_std_vec(),
+            vec![vec![3, 1, 2, 0], vec![4]]
+        );
     }
 }
