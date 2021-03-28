@@ -7,14 +7,12 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(js_name = kosarajuScc)]
 pub fn kosaraju_scc(graph: &DiGraph) -> SccGroups {
-    let scc_groups: Vec<Vec<graph::NodeIndex>> = algo::kosaraju_scc(&graph.graph);
-    return SccGroups::new(scc_groups);
+    SccGroups::new(algo::kosaraju_scc(&graph.graph))
 }
 
 #[wasm_bindgen(js_name = tarjanScc)]
 pub fn tarjan_scc(graph: &DiGraph) -> SccGroups {
-    let scc_groups: Vec<Vec<graph::NodeIndex>> = algo::tarjan_scc(&graph.graph);
-    return SccGroups::new(scc_groups);
+    SccGroups::new(algo::tarjan_scc(&graph.graph))
 }
 
 #[wasm_bindgen]

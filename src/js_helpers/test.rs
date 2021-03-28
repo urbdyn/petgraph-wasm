@@ -23,5 +23,5 @@ pub fn new_test_graph() -> (DiGraph, Vec<usize>, Vec<usize>) {
         g.add_edge(nodes[4], nodes[0], JsValue::NULL),
         g.add_edge(nodes[4], nodes[3], JsValue::NULL),
     ];
-    return (g, nodes, edges);
+    (g, nodes, edges)
 }

@@ -53,7 +53,7 @@ impl SccGroups {
                 scc_group.iter().enumerate().for_each(|(i, x)| {
                     array.set(i as u32, JsValue::from(x.index() as u32));
                 });
-                return array;
+                array
             })
             .collect::<js_sys::Array>()
     }
@@ -72,7 +72,7 @@ impl SccGroups {
 impl SccGroup {
     fn new(inner: Rc<Vec<Vec<graph::NodeIndex>>>, index: usize) -> Self {
         Self {
-            inner: inner,
+            inner,
             index,
         }
     }
@@ -92,7 +92,6 @@ impl SccGroup {
 mod tests {
     use super::*;
     use graph::NodeIndex;
-    use js_sys;
     use js_sys::Array;
     use wasm_bindgen_test::*;
 
