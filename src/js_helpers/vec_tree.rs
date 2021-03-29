@@ -332,17 +332,20 @@ impl<T1: Clone, T2> VecTreeView<T1, T2> {
         self.position.is_empty()
     }
 
+    /// If the view is a leaf-`Vec` in the `Vec` tree.
     pub fn is_leaf(&self) -> bool {
         self.vec_tree.inner().depth() - 1 == self.position.len()
     }
 
+    /// Get len for `Vec` selected by View
     pub fn len(&self) -> usize {
         self.vec_tree
             .get_len(&self.position)
             .expect("Failed to get length for VecTreeView")
     }
 
-    pub fn get_child(&self, index: usize) -> Option<Self> {
+    /// Get View at given position or panic if it's an Item
+    pub fn get_view(&self, index: usize) -> Option<Self> {
         let mut position = self.position.clone();
         position.push(index);
         match self.vec_tree.get(&position) {
@@ -350,6 +353,8 @@ impl<T1: Clone, T2> VecTreeView<T1, T2> {
             VecTreeElement::View(v) => v,
         }
     }
+
+    /// Get Item at given position or panic if it's a View
     pub fn get_item(&self, index: usize) -> Option<T2> {
         let mut position = self.position.clone();
         position.push(index);
