@@ -146,3 +146,30 @@ impl DiGraph {
         Some(neighbor_vec)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::js_helpers::test::new_test_graph;
+    use wasm_bindgen_test::*;
+
+    #[wasm_bindgen_test]
+    fn can_create_graph() {
+        let (g, nodes, edges) = new_test_graph();
+        assert_eq!(g.node_count(), 5);
+        assert_eq!(g.edge_count(), 9);
+        assert_eq!(nodes, vec![0, 1, 2, 3, 4]);
+        assert_eq!(edges, vec![0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    }
+
+    #[wasm_bindgen_test]
+    fn can_get_nodes_by_index() {
+        let (g, _nodes, _edges) = new_test_graph();
+        let nyc_name = g.node_weight(0).unwrap();
+        let vilnius_name = g.node_weight(1).unwrap();
+        let na_name = g.node_weight(9999).unwrap_err();
+        assert_eq!(nyc_name, "NYC");
+        assert_eq!(vilnius_name, "Vilnius");
+        assert_eq!(na_name, JsValue::from_str("No node exists for given index"));
+    }
+}
