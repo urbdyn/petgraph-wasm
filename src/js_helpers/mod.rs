@@ -3,3 +3,4 @@
 //! from Javascript.
 
 pub mod test;
+pub mod vec_tree;
