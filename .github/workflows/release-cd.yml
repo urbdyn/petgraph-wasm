@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 1
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Confirm Cargo version matches git tag
         run: |
@@ -39,7 +39,7 @@ jobs:
         rust-version: ['1.45.0', 'stable']
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install rust toolchain
         uses: actions-rs/toolchain@v1
@@ -102,7 +102,7 @@ jobs:
     needs: [create_release]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install rust toolchain
         uses: actions-rs/toolchain@v1
