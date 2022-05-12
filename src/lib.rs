@@ -1,5 +1,6 @@
 pub mod algo;
 pub mod graph_impl;
+pub mod js_helpers;
 mod utils;
 
 use petgraph::algo::Cycle;
