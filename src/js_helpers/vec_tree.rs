@@ -117,7 +117,7 @@ impl<T1: Clone, T2> VecTree<T1, T2> {
     ///
     /// Note that calling `get_len` with position being an empty `Vec` will return
     /// length of the root node of the `VecTree`.
-    pub fn get_len(&self, position: &Vec<usize>) -> Option<usize> {
+    pub fn get_len(&self, position: &[usize]) -> Option<usize> {
         match self.inner.as_ref() {
             VecTreeInner::Vt1D(vt1d) => match position.len() {
                 0 => Some(vt1d.data.len()),
@@ -125,17 +125,17 @@ impl<T1: Clone, T2> VecTree<T1, T2> {
             },
             VecTreeInner::Vt2D(vt2d) => match position.len() {
                 0 => Some(vt2d.data.len()),
-                1 => vt2d.data.get(position[0]).and_then(|x| Some(x.len())),
+                1 => vt2d.data.get(position[0]).map(|x| x.len()),
                 _ => panic!("to get len of 2d VecTree, position should have length 0 to 1"),
             },
             VecTreeInner::Vt3D(vt3d) => match position.len() {
                 0 => Some(vt3d.data.len()),
-                1 => vt3d.data.get(position[0]).and_then(|x| Some(x.len())),
+                1 => vt3d.data.get(position[0]).map(|x| x.len()),
                 2 => vt3d
                     .data
                     .get(position[0])
                     .and_then(|x| x.get(position[1]))
-                    .and_then(|x| Some(x.len())),
+                    .map(|x| x.len()),
                 _ => panic!("to get len of 3d VecTree, position should have length 0 to 2"),
             },
         }
@@ -182,6 +182,8 @@ pub trait VecTreeN<T> {
     fn get_item(&self, position: &[usize]) -> Option<T>;
     /// Get length for top level of `VecTree`
     fn len(&self) -> usize;
+    /// Check if `VecTree` is empty
+    fn is_empty(&self) -> bool;
     /// Consume the `VecTreeN` and return its inner vec structure.
     fn into_vecs(self) -> Vec<Self::Child>;
     /// Get iterator over internal vec data.
@@ -198,15 +200,15 @@ impl<T1: Clone, T2> VecTreeN<T2> for VecTree1<T1, T2> {
 
     fn get_item(&self, position: &[usize]) -> Option<T2> {
         match position.len() {
-            1 => self
-                .data
-                .get(position[0])
-                .and_then(|x| Some((self.transform)(x))),
+            1 => self.data.get(position[0]).map(|x| (self.transform)(x)),
             _ => panic!("get_item for 1d VecTree, position should have length 1"),
         }
     }
     fn len(&self) -> usize {
         self.data.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
     fn into_vecs(self) -> Vec<Self::Child> {
         self.data
@@ -230,12 +232,15 @@ impl<T1: Clone, T2> VecTreeN<T2> for VecTree2<T1, T2> {
                 .data
                 .get(position[0])
                 .and_then(|x| x.get(position[1]))
-                .and_then(|x| Some((self.transform)(x))),
+                .map(|x| (self.transform)(x)),
             _ => panic!("get_item for 2d VecTree, position should have length 2"),
         }
     }
     fn len(&self) -> usize {
         self.data.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
     fn into_vecs(self) -> Vec<Self::Child> {
         self.data
@@ -260,12 +265,15 @@ impl<T1: Clone, T2> VecTreeN<T2> for VecTree3<T1, T2> {
                 .get(position[0])
                 .and_then(|x| x.get(position[1]))
                 .and_then(|x| x.get(position[2]))
-                .and_then(|x| Some((self.transform)(x))),
+                .map(|x| (self.transform)(x)),
             _ => panic!("get_item for 3d VecTree, position should have length 3"),
         }
     }
     fn len(&self) -> usize {
         self.data.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
     fn into_vecs(self) -> Vec<Self::Child> {
         self.data
@@ -344,6 +352,11 @@ impl<T1: Clone, T2> VecTreeView<T1, T2> {
             .expect("Failed to get length for VecTreeView")
     }
 
+    /// Check if `Vec` selected by View is empty
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
+    }
+
     /// Get View at given position or panic if it's an Item
     pub fn get_view(&self, index: usize) -> Option<Self> {
         let mut position = self.position.clone();
@@ -397,39 +410,39 @@ mod tests {
     #[test]
     fn vt1d_can_get_len_for_positions() {
         let vt1d = new_test_vec_tree_1();
-        assert_eq!(vt1d.get_len(&vec![]), Some(4));
+        assert_eq!(vt1d.get_len(&[]), Some(4));
     }
 
     #[test]
     fn vt2d_can_get_len_for_positions() {
         let vt2d = new_test_vec_tree_2();
-        assert_eq!(vt2d.get_len(&vec![]), Some(2));
-        assert_eq!(vt2d.get_len(&vec![0]), Some(4));
-        assert_eq!(vt2d.get_len(&vec![2]), None);
+        assert_eq!(vt2d.get_len(&[]), Some(2));
+        assert_eq!(vt2d.get_len(&[0]), Some(4));
+        assert_eq!(vt2d.get_len(&[2]), None);
     }
 
     #[test]
     fn vt3d_can_get_len_for_positions() {
         let vt3d = new_test_vec_tree_3();
-        assert_eq!(vt3d.get_len(&vec![]), Some(2));
-        assert_eq!(vt3d.get_len(&vec![0]), Some(2));
-        assert_eq!(vt3d.get_len(&vec![2]), None);
-        assert_eq!(vt3d.get_len(&vec![0, 0]), Some(4));
-        assert_eq!(vt3d.get_len(&vec![0, 2]), None);
+        assert_eq!(vt3d.get_len(&[]), Some(2));
+        assert_eq!(vt3d.get_len(&[0]), Some(2));
+        assert_eq!(vt3d.get_len(&[2]), None);
+        assert_eq!(vt3d.get_len(&[0, 0]), Some(4));
+        assert_eq!(vt3d.get_len(&[0, 2]), None);
     }
 
     #[test]
     fn vt1d_can_get_view_for_positions() {
         let vt1d = new_test_vec_tree_1();
 
-        let vt1d_view1 = vt1d.get(&vec![]).unwrap_as_view().unwrap();
-        assert_eq!(vt1d_view1.is_root(), true);
-        assert_eq!(vt1d_view1.is_leaf(), true);
+        let vt1d_view1 = vt1d.get(&[]).unwrap_as_view().unwrap();
+        assert!(vt1d_view1.is_root());
+        assert!(vt1d_view1.is_leaf());
         assert_eq!(vt1d_view1.len(), 4);
         assert_eq!(vt1d_view1.current_depth(), 0);
         assert_eq!(vt1d_view1.max_depth(), 0);
 
-        let vt1d_view2 = vt1d.get(&vec![3]).unwrap_as_item();
+        let vt1d_view2 = vt1d.get(&[3]).unwrap_as_item();
         assert_eq!(vt1d_view2, Some(3));
     }
 
@@ -437,23 +450,23 @@ mod tests {
     fn vt2d_can_get_view_for_positions() {
         let vt2d = new_test_vec_tree_2();
         {
-            let vt2d_view1 = vt2d.get(&vec![]).unwrap_as_view().unwrap();
-            assert_eq!(vt2d_view1.is_root(), true);
-            assert_eq!(vt2d_view1.is_leaf(), false);
+            let vt2d_view1 = vt2d.get(&[]).unwrap_as_view().unwrap();
+            assert!(vt2d_view1.is_root());
+            assert!(!vt2d_view1.is_leaf());
             assert_eq!(vt2d_view1.len(), 2);
             assert_eq!(vt2d_view1.current_depth(), 0);
             assert_eq!(vt2d_view1.max_depth(), 1);
         }
         {
-            let vt2d_view2 = vt2d.get(&vec![0]).unwrap_as_view().unwrap();
-            assert_eq!(vt2d_view2.is_root(), false);
-            assert_eq!(vt2d_view2.is_leaf(), true);
+            let vt2d_view2 = vt2d.get(&[0]).unwrap_as_view().unwrap();
+            assert!(!vt2d_view2.is_root());
+            assert!(vt2d_view2.is_leaf());
             assert_eq!(vt2d_view2.len(), 4);
             assert_eq!(vt2d_view2.current_depth(), 1);
             assert_eq!(vt2d_view2.max_depth(), 1);
         }
         {
-            let vt2d_view3 = vt2d.get(&vec![0, 3]).unwrap_as_item();
+            let vt2d_view3 = vt2d.get(&[0, 3]).unwrap_as_item();
             assert_eq!(vt2d_view3, Some(3));
         }
     }
@@ -462,31 +475,31 @@ mod tests {
     fn vt3d_can_get_view_for_positions() {
         let vt3d = new_test_vec_tree_3();
         {
-            let vt3d_view1 = vt3d.get(&vec![]).unwrap_as_view().unwrap();
-            assert_eq!(vt3d_view1.is_root(), true);
-            assert_eq!(vt3d_view1.is_leaf(), false);
+            let vt3d_view1 = vt3d.get(&[]).unwrap_as_view().unwrap();
+            assert!(vt3d_view1.is_root());
+            assert!(!vt3d_view1.is_leaf());
             assert_eq!(vt3d_view1.len(), 2);
             assert_eq!(vt3d_view1.current_depth(), 0);
             assert_eq!(vt3d_view1.max_depth(), 2);
         }
         {
-            let vt3d_view2 = vt3d.get(&vec![0]).unwrap_as_view().unwrap();
-            assert_eq!(vt3d_view2.is_root(), false);
-            assert_eq!(vt3d_view2.is_leaf(), false);
+            let vt3d_view2 = vt3d.get(&[0]).unwrap_as_view().unwrap();
+            assert!(!vt3d_view2.is_root());
+            assert!(!vt3d_view2.is_leaf());
             assert_eq!(vt3d_view2.len(), 2);
             assert_eq!(vt3d_view2.current_depth(), 1);
             assert_eq!(vt3d_view2.max_depth(), 2);
         }
         {
-            let vt3d_view3 = vt3d.get(&vec![0, 1]).unwrap_as_view().unwrap();
-            assert_eq!(vt3d_view3.is_root(), false);
-            assert_eq!(vt3d_view3.is_leaf(), true);
+            let vt3d_view3 = vt3d.get(&[0, 1]).unwrap_as_view().unwrap();
+            assert!(!vt3d_view3.is_root());
+            assert!(vt3d_view3.is_leaf());
             assert_eq!(vt3d_view3.len(), 1);
             assert_eq!(vt3d_view3.current_depth(), 2);
             assert_eq!(vt3d_view3.max_depth(), 2);
         }
         {
-            let vt3d_view4 = vt3d.get(&vec![0, 1, 0]).unwrap_as_item();
+            let vt3d_view4 = vt3d.get(&[0, 1, 0]).unwrap_as_item();
             assert_eq!(vt3d_view4, Some(4));
         }
     }
