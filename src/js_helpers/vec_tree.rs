@@ -1,21 +1,37 @@
+//! `VecTree` and friends are a way to traverse arbitrary dimensional
+//! (currently 1 to 3) nested `Vec`s. It is used to take away the boilerplate
+//! from creating JS WASM friendly access structs over nested `Vec`s, which are
+//! common in petgraph.
+
 use std::fmt;
 use std::rc::Rc;
 
-pub trait VecTreeItem: Clone {}
-
-impl VecTreeItem for u8 {}
-impl VecTreeItem for u16 {}
-impl VecTreeItem for u32 {}
-impl VecTreeItem for u64 {}
-impl VecTreeItem for usize {}
-
-/// Accessor over a vector tree of unknown depth
+/// Accessor over a vector tree of various depth/dimension (currently 1 to 3)
+///
+/// * Type `T1` is the Type of the data in the nested Vec.
+/// * Type `T2` is the Type returned when accessing the data, via transform.
+/// * You can have `T1` and `T2` be the same and the transform be an identity
+///   function if no transform is needed.
+///
+/// Example usage:
+/// ```rust
+/// use petgraph_wasm::js_helpers::vec_tree::*;
+/// // Create vec
+/// let vec1d = vec![0,1,2,3];
+/// // 1D VecTree that returns values as bool based on whether they're even.
+/// let vt1d_to_bool = VecTree::new1d(vec1d, |x| x % 2 == 0);
+/// // Get the second element
+/// let vt1d_to_bool_item2 = vt1d_to_bool.get(&vec![1]).unwrap_as_item();
+/// assert_eq!(vt1d_to_bool_item2, Some(false));
+/// ```
 #[derive(Debug)]
-pub struct VecTree<T1: VecTreeItem, T2 = T1> {
+pub struct VecTree<T1: Clone, T2 = T1> {
     inner: Rc<VecTreeInner<T1, T2>>,
 }
 
-impl<T1: VecTreeItem, T2> Clone for VecTree<T1, T2> {
+/// Manually implemented as T2 doesn't necessarily implement `Clone` and thus
+/// it can't be derived.
+impl<T1: Clone, T2> Clone for VecTree<T1, T2> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -23,65 +39,85 @@ impl<T1: VecTreeItem, T2> Clone for VecTree<T1, T2> {
     }
 }
 
-impl<T1: VecTreeItem, T2> VecTree<T1, T2> {
-    /// Create a VecTree from a 1d vec (`Vec<T>`)
+impl<T1: Clone, T2> VecTree<T1, T2> {
+    /// Create a VecTree from a 1d vec (`Vec<T1>`) with transform which is
+    /// applied to values when retrieved.
     pub fn new1d(data: Vec<T1>, transform: fn(&T1) -> T2) -> Self {
-        return Self {
+        Self {
             inner: Rc::new(VecTreeInner::Vt1D(VecTree1 { data, transform })),
-        };
+        }
     }
 
-    /// Create a VecTree from a 2d vec (`Vec<Vec<T>>`)
+    /// Create a VecTree from a 2d vec (`Vec<Vec<T1>>`) with transform which is
+    /// applied to values when retrieved.
     pub fn new2d(data: Vec<Vec<T1>>, transform: fn(&T1) -> T2) -> Self {
-        return Self {
+        Self {
             inner: Rc::new(VecTreeInner::Vt2D(VecTree2 { data, transform })),
-        };
+        }
     }
 
-    /// Create a VecTree from a 3d vec (`Vec<Vec<Vec<T>>>`)
+    /// Create a VecTree from a 3d vec (`Vec<Vec<Vec<T1>>>`) with transform which is
+    /// applied to values when retrieved.
     pub fn new3d(data: Vec<Vec<Vec<T1>>>, transform: fn(&T1) -> T2) -> Self {
-        return Self {
+        Self {
             inner: Rc::new(VecTreeInner::Vt3D(VecTree3 { data, transform })),
-        };
+        }
     }
 
+    /// Attempt to unwrap self as `VecTreeInner` from `Rc` or return `Self` on
+    /// failure.
     pub fn try_unwrap(self) -> Result<VecTreeInner<T1, T2>, Self> {
-        Rc::try_unwrap(self.inner).or_else(|inner| Err(Self { inner }))
+        Rc::try_unwrap(self.inner).map_err(|inner| Self { inner })
     }
 
+    /// Return `Rc` cloned ref of inner `VecTreeInner`. Useful for when needing to
+    /// directly traverse the `Vec`s.
     pub fn inner(&self) -> Rc<VecTreeInner<T1, T2>> {
         self.inner.clone()
     }
 
-    /// Get the depth of the vec tree. This is the number of nested `Vec`s.
+    /// Get's depth/dimensions of `VecTree`
     pub fn depth(&self) -> usize {
-        match self.inner.as_ref() {
-            VecTreeInner::Vt1D(_) => 1,
-            VecTreeInner::Vt2D(_) => 2,
-            VecTreeInner::Vt3D(_) => 3,
-        }
+        self.inner.depth()
     }
 
-    pub fn get(&self, position: &Vec<usize>) -> VecTreeElement<T1, T2> {
+    /// Takes a "position" vector which is the index's to traverse from the top
+    /// down through the `VecTree`. If the length of positions is more than the
+    /// VecTree has then it will `panic!`. Else returns `VecTreeElement` which
+    /// is either a `View` struct which can be used to further access its
+    /// children or an `Item` which is the child of a leaf `Vec`. Both are
+    /// `Option`s as the requested index may or may not exist.
+    ///
+    /// Note that calling `get` with position being an empty `Vec` will return
+    /// a `VecTreeView` over the entire `VecTree`.
+    pub fn get(&self, position: &[usize]) -> VecTreeElement<T1, T2> {
         match self.inner.as_ref() {
             VecTreeInner::Vt1D(vt1d) => match position.len() {
-                0 => VecTreeElement::View(VecTreeView::new(self, position)),
+                0 => VecTreeElement::View(Some(VecTreeView::new(self, position))),
                 1 => VecTreeElement::Item(vt1d.get_item(position)),
                 _ => panic!("accessing 1d VecTree, position should have length 0 to 1"),
             },
             VecTreeInner::Vt2D(vt2d) => match position.len() {
-                0 | 1 => VecTreeElement::View(VecTreeView::new(self, position)),
+                0 | 1 => VecTreeElement::View(Some(VecTreeView::new(self, position))),
                 2 => VecTreeElement::Item(vt2d.get_item(position)),
                 _ => panic!("accessing 2d VecTree, position should have length 0 to 2"),
             },
             VecTreeInner::Vt3D(vt3d) => match position.len() {
-                0 | 1 | 2 => VecTreeElement::View(VecTreeView::new(self, position)),
+                0 | 1 | 2 => VecTreeElement::View(Some(VecTreeView::new(self, position))),
                 3 => VecTreeElement::Item(vt3d.get_item(position)),
                 _ => panic!("accessing 3d VecTree, position should have length 0 to 3"),
             },
         }
     }
-    pub fn get_len(&self, position: &Vec<usize>) -> Option<usize> {
+
+    /// Gets the length of the `Vec` a "position" which is the indexes to traverse
+    /// from the top down through the `VecTree`. If the length of positions is
+    /// more than the VecTree has then it will `panic!`. Else returns `Option<usize>`
+    /// which is `None` if the `position` doesn't exist in the `VecTree`.
+    ///
+    /// Note that calling `get_len` with position being an empty `Vec` will return
+    /// length of the root node of the `VecTree`.
+    pub fn get_len(&self, position: &[usize]) -> Option<usize> {
         match self.inner.as_ref() {
             VecTreeInner::Vt1D(vt1d) => match position.len() {
                 0 => Some(vt1d.data.len()),
@@ -89,17 +125,17 @@ impl<T1: VecTreeItem, T2> VecTree<T1, T2> {
             },
             VecTreeInner::Vt2D(vt2d) => match position.len() {
                 0 => Some(vt2d.data.len()),
-                1 => vt2d.data.get(position[0]).and_then(|x| Some(x.len())),
+                1 => vt2d.data.get(position[0]).map(|x| x.len()),
                 _ => panic!("to get len of 2d VecTree, position should have length 0 to 1"),
             },
             VecTreeInner::Vt3D(vt3d) => match position.len() {
                 0 => Some(vt3d.data.len()),
-                1 => vt3d.data.get(position[0]).and_then(|x| Some(x.len())),
+                1 => vt3d.data.get(position[0]).map(|x| x.len()),
                 2 => vt3d
                     .data
                     .get(position[0])
                     .and_then(|x| x.get(position[1]))
-                    .and_then(|x| Some(x.len())),
+                    .map(|x| x.len()),
                 _ => panic!("to get len of 3d VecTree, position should have length 0 to 2"),
             },
         }
@@ -107,13 +143,24 @@ impl<T1: VecTreeItem, T2> VecTree<T1, T2> {
 }
 
 /// Inner storage for VecTree
-pub enum VecTreeInner<T1: VecTreeItem, T2> {
+pub enum VecTreeInner<T1: Clone, T2> {
     Vt1D(VecTree1<T1, T2>),
     Vt2D(VecTree2<T1, T2>),
     Vt3D(VecTree3<T1, T2>),
 }
 
-impl<T1: VecTreeItem, T2> fmt::Debug for VecTreeInner<T1, T2> {
+impl<T1: Clone, T2> VecTreeInner<T1, T2> {
+    /// Returns the depth of the `VecTreeInner`
+    pub fn depth(&self) -> usize {
+        match self {
+            VecTreeInner::Vt1D(_) => 1,
+            VecTreeInner::Vt2D(_) => 2,
+            VecTreeInner::Vt3D(_) => 3,
+        }
+    }
+}
+
+impl<T1: Clone, T2> fmt::Debug for VecTreeInner<T1, T2> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (vti_type, len) = match self {
             VecTreeInner::Vt1D(vt1d) => ("Vt1D", vt1d.len()),
@@ -127,34 +174,41 @@ impl<T1: VecTreeItem, T2> fmt::Debug for VecTreeInner<T1, T2> {
     }
 }
 
+/// Trait over VecTree storage objects for particular dimensionality.
 pub trait VecTreeN<T> {
     type Child;
 
-    fn get_item(&self, position: &Vec<usize>) -> Option<T>;
+    /// Get the item for the position
+    fn get_item(&self, position: &[usize]) -> Option<T>;
+    /// Get length for top level of `VecTree`
     fn len(&self) -> usize;
+    /// Check if `VecTree` is empty
+    fn is_empty(&self) -> bool;
+    /// Consume the `VecTreeN` and return its inner vec structure.
     fn into_vecs(self) -> Vec<Self::Child>;
+    /// Get iterator over internal vec data.
     fn data_iter(&self) -> std::slice::Iter<'_, Self::Child>;
 }
 
 /// VecTree for depth 1
-pub struct VecTree1<T1: VecTreeItem, T2> {
+pub struct VecTree1<T1: Clone, T2> {
     data: Vec<T1>,
     transform: fn(&T1) -> T2,
 }
-impl<T1: VecTreeItem, T2> VecTreeN<T2> for VecTree1<T1, T2> {
+impl<T1: Clone, T2> VecTreeN<T2> for VecTree1<T1, T2> {
     type Child = T1;
 
-    fn get_item(&self, position: &Vec<usize>) -> Option<T2> {
+    fn get_item(&self, position: &[usize]) -> Option<T2> {
         match position.len() {
-            1 => self
-                .data
-                .get(position[0])
-                .and_then(|x| Some((self.transform)(x))),
+            1 => self.data.get(position[0]).map(|x| (self.transform)(x)),
             _ => panic!("get_item for 1d VecTree, position should have length 1"),
         }
     }
     fn len(&self) -> usize {
         self.data.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
     fn into_vecs(self) -> Vec<Self::Child> {
         self.data
@@ -165,25 +219,28 @@ impl<T1: VecTreeItem, T2> VecTreeN<T2> for VecTree1<T1, T2> {
 }
 
 /// VecTree for depth 2
-pub struct VecTree2<T1: VecTreeItem, T2> {
+pub struct VecTree2<T1: Clone, T2> {
     data: Vec<Vec<T1>>,
     transform: fn(&T1) -> T2,
 }
-impl<T1: VecTreeItem, T2> VecTreeN<T2> for VecTree2<T1, T2> {
+impl<T1: Clone, T2> VecTreeN<T2> for VecTree2<T1, T2> {
     type Child = Vec<T1>;
 
-    fn get_item(&self, position: &Vec<usize>) -> Option<T2> {
+    fn get_item(&self, position: &[usize]) -> Option<T2> {
         match position.len() {
             2 => self
                 .data
                 .get(position[0])
                 .and_then(|x| x.get(position[1]))
-                .and_then(|x| Some((self.transform)(x))),
+                .map(|x| (self.transform)(x)),
             _ => panic!("get_item for 2d VecTree, position should have length 2"),
         }
     }
     fn len(&self) -> usize {
         self.data.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
     fn into_vecs(self) -> Vec<Self::Child> {
         self.data
@@ -194,26 +251,29 @@ impl<T1: VecTreeItem, T2> VecTreeN<T2> for VecTree2<T1, T2> {
 }
 
 /// VecTree for depth 3
-pub struct VecTree3<T1: VecTreeItem, T2> {
+pub struct VecTree3<T1: Clone, T2> {
     data: Vec<Vec<Vec<T1>>>,
     transform: fn(&T1) -> T2,
 }
-impl<T1: VecTreeItem, T2> VecTreeN<T2> for VecTree3<T1, T2> {
+impl<T1: Clone, T2> VecTreeN<T2> for VecTree3<T1, T2> {
     type Child = Vec<Vec<T1>>;
 
-    fn get_item(&self, position: &Vec<usize>) -> Option<T2> {
+    fn get_item(&self, position: &[usize]) -> Option<T2> {
         match position.len() {
             3 => self
                 .data
                 .get(position[0])
                 .and_then(|x| x.get(position[1]))
                 .and_then(|x| x.get(position[2]))
-                .and_then(|x| Some((self.transform)(x))),
+                .map(|x| (self.transform)(x)),
             _ => panic!("get_item for 3d VecTree, position should have length 3"),
         }
     }
     fn len(&self) -> usize {
         self.data.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
     fn into_vecs(self) -> Vec<Self::Child> {
         self.data
@@ -223,19 +283,20 @@ impl<T1: VecTreeItem, T2> VecTreeN<T2> for VecTree3<T1, T2> {
     }
 }
 
-/// Either a view of a `VecTree` of one of its `VecTreeItem`s
-pub enum VecTreeElement<T1: VecTreeItem, T2> {
+/// Either a view of a `VecTree` of one of its `Clone`s
+pub enum VecTreeElement<T1: Clone, T2> {
     View(Option<VecTreeView<T1, T2>>),
     Item(Option<T2>),
 }
-impl<T1: VecTreeItem, T2> VecTreeElement<T1, T2> {
+impl<T1: Clone, T2> VecTreeElement<T1, T2> {
+    /// Attempt to unwrap to `VecTreeElement::View` or `panic!`
     pub fn unwrap_as_view(self) -> Option<VecTreeView<T1, T2>> {
         match self {
             VecTreeElement::View(v) => v,
             _ => panic!("Attempted VecTreeElement::unwrap_as_view on non-view element"),
         }
     }
-
+    /// Attempt to unwrap to `VecTreeElement::Item` or `panic!`
     pub fn unwrap_as_item(self) -> Option<T2> {
         match self {
             VecTreeElement::Item(i) => i,
@@ -244,44 +305,60 @@ impl<T1: VecTreeItem, T2> VecTreeElement<T1, T2> {
     }
 }
 
-/// View from a particular location in a `VecTree`
+/// View from a particular location in a `VecTree`.
+/// This is a light weight struct which allows for exploring and interacting
+/// with a `VecTree`.
 #[derive(Debug)]
-pub struct VecTreeView<T1: VecTreeItem, T2 = T1> {
+pub struct VecTreeView<T1: Clone, T2 = T1> {
     vec_tree: VecTree<T1, T2>,
     position: Vec<usize>,
 }
 
-impl<T1: VecTreeItem, T2> VecTreeView<T1, T2> {
-    fn new(vec_tree: &VecTree<T1, T2>, position: &Vec<usize>) -> Option<Self> {
-        Some(Self {
+impl<T1: Clone, T2> VecTreeView<T1, T2> {
+    fn new(vec_tree: &VecTree<T1, T2>, position: &[usize]) -> Self {
+        Self {
             vec_tree: vec_tree.clone(),
-            position: position.clone(),
-        })
+            position: position.to_vec(),
+        }
     }
 
+    /// Gets the current depth `VecTreeView` relative to the `VecTree`.
+    /// Zero indexed, so one layer "down" from the root node is depth 1.
     pub fn current_depth(&self) -> usize {
         self.position.len()
     }
 
+    /// Gets the max depth of the `VecTree`.
+    /// Zero indexed and only counts Vecs, so one `Vec` layer "down" from
+    /// the root node is depth 1.
     pub fn max_depth(&self) -> usize {
-        self.vec_tree.depth() - 1
+        self.vec_tree.inner().depth() - 1
     }
 
+    /// If the view is at the root node.
     pub fn is_root(&self) -> bool {
         self.position.is_empty()
     }
 
+    /// If the view is a leaf-`Vec` in the `Vec` tree.
     pub fn is_leaf(&self) -> bool {
-        self.vec_tree.depth() - 1 == self.position.len()
+        self.vec_tree.inner().depth() - 1 == self.position.len()
     }
 
+    /// Get len for `Vec` selected by View
     pub fn len(&self) -> usize {
         self.vec_tree
             .get_len(&self.position)
             .expect("Failed to get length for VecTreeView")
     }
 
-    pub fn get_child(&self, index: usize) -> Option<Self> {
+    /// Check if `Vec` selected by View is empty
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
+    }
+
+    /// Get View at given position or panic if it's an Item
+    pub fn get_view(&self, index: usize) -> Option<Self> {
         let mut position = self.position.clone();
         position.push(index);
         match self.vec_tree.get(&position) {
@@ -289,6 +366,8 @@ impl<T1: VecTreeItem, T2> VecTreeView<T1, T2> {
             VecTreeElement::View(v) => v,
         }
     }
+
+    /// Get Item at given position or panic if it's a View
     pub fn get_item(&self, index: usize) -> Option<T2> {
         let mut position = self.position.clone();
         position.push(index);
@@ -331,39 +410,39 @@ mod tests {
     #[test]
     fn vt1d_can_get_len_for_positions() {
         let vt1d = new_test_vec_tree_1();
-        assert_eq!(vt1d.get_len(&vec![]), Some(4));
+        assert_eq!(vt1d.get_len(&[]), Some(4));
     }
 
     #[test]
     fn vt2d_can_get_len_for_positions() {
         let vt2d = new_test_vec_tree_2();
-        assert_eq!(vt2d.get_len(&vec![]), Some(2));
-        assert_eq!(vt2d.get_len(&vec![0]), Some(4));
-        assert_eq!(vt2d.get_len(&vec![2]), None);
+        assert_eq!(vt2d.get_len(&[]), Some(2));
+        assert_eq!(vt2d.get_len(&[0]), Some(4));
+        assert_eq!(vt2d.get_len(&[2]), None);
     }
 
     #[test]
     fn vt3d_can_get_len_for_positions() {
         let vt3d = new_test_vec_tree_3();
-        assert_eq!(vt3d.get_len(&vec![]), Some(2));
-        assert_eq!(vt3d.get_len(&vec![0]), Some(2));
-        assert_eq!(vt3d.get_len(&vec![2]), None);
-        assert_eq!(vt3d.get_len(&vec![0, 0]), Some(4));
-        assert_eq!(vt3d.get_len(&vec![0, 2]), None);
+        assert_eq!(vt3d.get_len(&[]), Some(2));
+        assert_eq!(vt3d.get_len(&[0]), Some(2));
+        assert_eq!(vt3d.get_len(&[2]), None);
+        assert_eq!(vt3d.get_len(&[0, 0]), Some(4));
+        assert_eq!(vt3d.get_len(&[0, 2]), None);
     }
 
     #[test]
     fn vt1d_can_get_view_for_positions() {
         let vt1d = new_test_vec_tree_1();
 
-        let vt1d_view1 = vt1d.get(&vec![]).unwrap_as_view().unwrap();
-        assert_eq!(vt1d_view1.is_root(), true);
-        assert_eq!(vt1d_view1.is_leaf(), true);
+        let vt1d_view1 = vt1d.get(&[]).unwrap_as_view().unwrap();
+        assert!(vt1d_view1.is_root());
+        assert!(vt1d_view1.is_leaf());
         assert_eq!(vt1d_view1.len(), 4);
         assert_eq!(vt1d_view1.current_depth(), 0);
         assert_eq!(vt1d_view1.max_depth(), 0);
 
-        let vt1d_view2 = vt1d.get(&vec![3]).unwrap_as_item();
+        let vt1d_view2 = vt1d.get(&[3]).unwrap_as_item();
         assert_eq!(vt1d_view2, Some(3));
     }
 
@@ -371,23 +450,23 @@ mod tests {
     fn vt2d_can_get_view_for_positions() {
         let vt2d = new_test_vec_tree_2();
         {
-            let vt2d_view1 = vt2d.get(&vec![]).unwrap_as_view().unwrap();
-            assert_eq!(vt2d_view1.is_root(), true);
-            assert_eq!(vt2d_view1.is_leaf(), false);
+            let vt2d_view1 = vt2d.get(&[]).unwrap_as_view().unwrap();
+            assert!(vt2d_view1.is_root());
+            assert!(!vt2d_view1.is_leaf());
             assert_eq!(vt2d_view1.len(), 2);
             assert_eq!(vt2d_view1.current_depth(), 0);
             assert_eq!(vt2d_view1.max_depth(), 1);
         }
         {
-            let vt2d_view2 = vt2d.get(&vec![0]).unwrap_as_view().unwrap();
-            assert_eq!(vt2d_view2.is_root(), false);
-            assert_eq!(vt2d_view2.is_leaf(), true);
+            let vt2d_view2 = vt2d.get(&[0]).unwrap_as_view().unwrap();
+            assert!(!vt2d_view2.is_root());
+            assert!(vt2d_view2.is_leaf());
             assert_eq!(vt2d_view2.len(), 4);
             assert_eq!(vt2d_view2.current_depth(), 1);
             assert_eq!(vt2d_view2.max_depth(), 1);
         }
         {
-            let vt2d_view3 = vt2d.get(&vec![0, 3]).unwrap_as_item();
+            let vt2d_view3 = vt2d.get(&[0, 3]).unwrap_as_item();
             assert_eq!(vt2d_view3, Some(3));
         }
     }
@@ -396,31 +475,31 @@ mod tests {
     fn vt3d_can_get_view_for_positions() {
         let vt3d = new_test_vec_tree_3();
         {
-            let vt3d_view1 = vt3d.get(&vec![]).unwrap_as_view().unwrap();
-            assert_eq!(vt3d_view1.is_root(), true);
-            assert_eq!(vt3d_view1.is_leaf(), false);
+            let vt3d_view1 = vt3d.get(&[]).unwrap_as_view().unwrap();
+            assert!(vt3d_view1.is_root());
+            assert!(!vt3d_view1.is_leaf());
             assert_eq!(vt3d_view1.len(), 2);
             assert_eq!(vt3d_view1.current_depth(), 0);
             assert_eq!(vt3d_view1.max_depth(), 2);
         }
         {
-            let vt3d_view2 = vt3d.get(&vec![0]).unwrap_as_view().unwrap();
-            assert_eq!(vt3d_view2.is_root(), false);
-            assert_eq!(vt3d_view2.is_leaf(), false);
+            let vt3d_view2 = vt3d.get(&[0]).unwrap_as_view().unwrap();
+            assert!(!vt3d_view2.is_root());
+            assert!(!vt3d_view2.is_leaf());
             assert_eq!(vt3d_view2.len(), 2);
             assert_eq!(vt3d_view2.current_depth(), 1);
             assert_eq!(vt3d_view2.max_depth(), 2);
         }
         {
-            let vt3d_view3 = vt3d.get(&vec![0, 1]).unwrap_as_view().unwrap();
-            assert_eq!(vt3d_view3.is_root(), false);
-            assert_eq!(vt3d_view3.is_leaf(), true);
+            let vt3d_view3 = vt3d.get(&[0, 1]).unwrap_as_view().unwrap();
+            assert!(!vt3d_view3.is_root());
+            assert!(vt3d_view3.is_leaf());
             assert_eq!(vt3d_view3.len(), 1);
             assert_eq!(vt3d_view3.current_depth(), 2);
             assert_eq!(vt3d_view3.max_depth(), 2);
         }
         {
-            let vt3d_view4 = vt3d.get(&vec![0, 1, 0]).unwrap_as_item();
+            let vt3d_view4 = vt3d.get(&[0, 1, 0]).unwrap_as_item();
             assert_eq!(vt3d_view4, Some(4));
         }
     }

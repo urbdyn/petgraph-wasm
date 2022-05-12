@@ -1,8 +1,13 @@
+//! Test helpers for the library, such as generating test data.
+//! Only compiled when building tests.
+
 #![cfg(test)]
 
 use crate::graph_impl::DiGraph;
 use wasm_bindgen::JsValue;
 
+/// Generate a test graph of 5 nodes with city names with 9 un-weighted edges
+/// and no cycles.
 pub fn new_test_graph() -> (DiGraph, Vec<usize>, Vec<usize>) {
     let mut g = DiGraph::new(None, None);
     let nodes = vec![

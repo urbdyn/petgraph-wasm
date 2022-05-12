@@ -25,7 +25,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ matrix.rust-version }}-${{ hashFiles('**/Cargo.toml') }}
+          key: ${{ runner.os }}-cargo-${{ matrix.rust-version }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install rust toolchain
         uses: actions-rs/toolchain@v1
@@ -46,6 +46,10 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
+      - name: cargo test
+        uses: actions-rs/cargo@v1
+        with: { command: test }
+      
       - run: wasm-pack test --node
 
       - run: ./bin/ci.sh
