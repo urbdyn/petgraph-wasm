@@ -1,5 +1,5 @@
 use crate::graph_impl::DiGraph;
-use crate::js_helpers::scc_groups2::SccGroups;
+use crate::js_helpers::scc_groups::SccGroups;
 use crate::GraphError;
 use petgraph::algo;
 use petgraph::graph;

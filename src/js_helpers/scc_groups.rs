@@ -51,6 +51,11 @@ impl SccGroups {
         }
     }
 
+    #[wasm_bindgen(js_name = isEmpty)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Create copy of SccGroups as `Array<Array<number>>`.
     /// This is a convenience method for workings with SccGroups!
     /// Using native Javascript `Array`s is less memory efficient.
@@ -91,6 +96,11 @@ impl SccGroup {
     pub fn len(&self) -> usize {
         self.view.len()
     }
+
+    #[wasm_bindgen(js_name = isEmpty)]
+    pub fn is_empty(&self) -> bool {
+        self.view.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -113,15 +123,31 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn can_access_scc_groups() {
-        // JS string => "get"
-        let js_str_get = JsValue::from_str("get");
         // JS array => [0]
-        let js_array_0 = {
-            let x = js_sys::Array::new();
-            x.push(&JsValue::from(0));
-            x
-        };
+        let js_array_0 = js_sys::Array::of1(&JsValue::from(0u8));
+        // JsValue of SccGroups1
+        let scc_groups = JsValue::from(new_test_scc_groups());
+        assert!(scc_groups.is_object());
+        // Retrieve the "getGroup" function by name for scc_groups
+        let scc_groups_get_group_raw: JsValue =
+            js_sys::Reflect::get(&scc_groups, &JsValue::from_str("getGroup")).unwrap();
+        assert!(scc_groups_get_group_raw.is_function());
+        let scc_groups_get_group = js_sys::Function::from(scc_groups_get_group_raw);
 
-        let scc_group = new_test_scc_groups();
+        // Call scc_groups.getGroup(0) to get first scc_group object
+        let scc_group0: JsValue =
+            js_sys::Reflect::apply(&scc_groups_get_group, &scc_groups, &js_array_0).unwrap();
+        assert!(scc_group0.is_object());
+        // Retrieve the "getItem" function by name for scc_group
+        let scc_group0_get_item_raw: JsValue =
+            js_sys::Reflect::get(&scc_group0, &JsValue::from_str("getItem")).unwrap();
+        assert!(scc_group0_get_item_raw.is_function());
+        let scc_group0_get_item = js_sys::Function::from(scc_group0_get_item_raw);
+
+        // Retrieve the first item from the first group
+        let scc_group0_item0: JsValue =
+            js_sys::Reflect::apply(&scc_group0_get_item, &scc_group0, &js_array_0).unwrap();
+
+        assert_eq!(scc_group0_item0, JsValue::from(0));
     }
 }
