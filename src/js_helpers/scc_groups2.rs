@@ -3,20 +3,11 @@ use crate::js_helpers::vec_tree::*;
 use petgraph::graph;
 use wasm_bindgen::prelude::*;
 
-impl VecTreeItem for graph::NodeIndex {}
-
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct SccGroups {
     #[wasm_bindgen(skip)]
     pub vec_tree: VecTree<graph::NodeIndex, usize>,
-}
-
-#[wasm_bindgen]
-#[derive(Debug)]
-pub struct SccGroup {
-    #[wasm_bindgen(skip)]
-    pub view: VecTreeView<graph::NodeIndex, usize>,
 }
 
 impl SccGroups {
@@ -42,11 +33,21 @@ impl SccGroups {
 
 #[wasm_bindgen]
 impl SccGroups {
+    #[wasm_bindgen(js_name = getGroup)]
     pub fn get_group(&self, index: usize) -> Option<SccGroup> {
-        match self.vec_tree.get(&vec![index]) {
+        match self.vec_tree.get(&[index]) {
             VecTreeElement::View(Some(view)) => Some(SccGroup { view }),
             VecTreeElement::View(None) => None,
             VecTreeElement::Item(_) => panic!("SccGroups::get_group returned item"),
+        }
+    }
+
+    #[wasm_bindgen(js_name = length, getter)]
+    pub fn len(&self) -> usize {
+        match self.vec_tree.get(&[]) {
+            VecTreeElement::View(Some(view)) => view.len(),
+            VecTreeElement::View(None) => 0,
+            VecTreeElement::Item(_) => panic!("SccGroups::len returned item"),
         }
     }
 
@@ -58,27 +59,37 @@ impl SccGroups {
     #[wasm_bindgen(js_name = toArrays)]
     pub fn to_arrays(&self) -> js_sys::Array {
         match &*self.vec_tree.inner() {
-            VecTreeInner::Vt2D(vt2d) => {
-                let x = vt2d
-                    .data_iter()
-                    .map(|child_vec| {
-                        child_vec
-                            .iter()
-                            .map(|x| JsValue::from(x.index() as u32))
-                            .collect::<js_sys::Array>()
-                    })
-                    .collect::<js_sys::Array>();
-                return x;
-            }
+            VecTreeInner::Vt2D(vt2d) => vt2d
+                .data_iter()
+                .map(|child_vec| {
+                    child_vec
+                        .iter()
+                        .map(|x| JsValue::from(x.index() as u32))
+                        .collect::<js_sys::Array>()
+                })
+                .collect::<js_sys::Array>(),
             _ => panic!("SccGroups has wrong dimensional VecTree"),
         }
     }
 }
 
 #[wasm_bindgen]
+#[derive(Debug)]
+pub struct SccGroup {
+    #[wasm_bindgen(skip)]
+    pub view: VecTreeView<graph::NodeIndex, usize>,
+}
+
+#[wasm_bindgen]
 impl SccGroup {
+    #[wasm_bindgen(js_name = getItem)]
     pub fn get_item(&self, index: usize) -> Option<usize> {
         self.view.get_item(index)
+    }
+
+    #[wasm_bindgen(js_name = length, getter)]
+    pub fn len(&self) -> usize {
+        self.view.len()
     }
 }
 
@@ -86,7 +97,6 @@ impl SccGroup {
 mod tests {
     use super::*;
     use graph::NodeIndex;
-    use js_sys::Array;
     use wasm_bindgen_test::*;
 
     fn new_test_scc_groups() -> SccGroups {
@@ -111,5 +121,7 @@ mod tests {
             x.push(&JsValue::from(0));
             x
         };
+
+        let scc_group = new_test_scc_groups();
     }
 }
