@@ -1,0 +1,13 @@
+class SccGroups {
+    // NOTE: THIS IS ADDED AT BUILD TIME AFTER COMPILATION.
+    [Symbol.iterator]() {
+        let counter = 0;
+        return  {
+            next: () => {
+                counter++
+                return { value: this.getGroup(counter - 1), done: counter > this.length }
+            },
+        }
+    }
+
+    static __wrap(ptr) {

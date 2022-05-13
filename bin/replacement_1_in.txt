@@ -1,0 +1,3 @@
+class SccGroups {
+
+    static __wrap(ptr) {

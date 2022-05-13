@@ -10,3 +10,5 @@ wasm-pack build --target nodejs --release
 echo ""
 echo "Adding @urbdyn/ to package.json ..."
 sed -i.bak 's|"name": "petgraph-wasm",|"name": "@urbdyn/petgraph-wasm",|g' "$repo_dir/pkg/package.json"
+echo "Adding iterators to JS classes ..."
+$repo_dir/bin/patch_compiled_output.js

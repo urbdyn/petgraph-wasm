@@ -47,26 +47,12 @@ city_pairs2.forEach(([src,dest]) => {
 
 console.log("\nCreating SCC of nodes (tarjan) ...")
 
-function genIter(x, fnName) {
-    return {
-        [Symbol.iterator]() {
-            let counter = 0;
-            return  {
-                next: () => {
-                    counter++
-                    return { value: x[fnName](counter - 1), done: counter > x.length }
-                },
-            }
-        }
-    }
-}
-
 const scc_g = petgraph.tarjanScc(g)
 
 console.log("\nIterator test of SCC of nodes (tarjan) ...")
-for (scc_g_i of genIter(scc_g, 'getGroup')) {
+for (scc_g_i of scc_g) {
     console.log(scc_g_i)
-    for (scc_g_i_item of genIter(scc_g_i, 'getItem')) {
+    for (scc_g_i_item of scc_g_i) {
         console.log(`${scc_g_i_item} = ${g.nodeWeight(scc_g_i_item)}`)
     }
 }
