@@ -30,3 +30,13 @@ pub fn new_test_graph() -> (DiGraph, Vec<usize>, Vec<usize>) {
     ];
     (g, nodes, edges)
 }
+
+pub fn new_test_graph2() -> (DiGraph, Vec<usize>, Vec<usize>) {
+    let (mut g, mut nodes, mut edges) = new_test_graph();
+    nodes.extend(vec![
+        g.add_node(JsValue::from_str("Denver")),
+        g.add_node(JsValue::from_str("Amsterdam")),
+    ]);
+    edges.extend(vec![g.add_edge(nodes[5], nodes[6], JsValue::NULL)]);
+    (g, nodes, edges)
+}
