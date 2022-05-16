@@ -19,7 +19,7 @@ wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 js-sys = "0.3.47"
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.13"
+wasm-bindgen-test = "0.3.30"
 
 [profile.release]
 lto = true
